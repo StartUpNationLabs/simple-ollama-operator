@@ -1,0 +1,9 @@
+apiVersion: ollama.ollama.startupnation/v1
+kind: Model
+metadata:
+  labels:
+    app.kubernetes.io/name: simple-ollama-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: model-sample
+spec:
+  # TODO(user): Add fields here
