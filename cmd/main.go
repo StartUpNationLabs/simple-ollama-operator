@@ -37,7 +37,6 @@ import (
 
 	ollamav1 "github.com/StartUpNationLabs/simple-ollama-operator/api/v1"
 	"github.com/StartUpNationLabs/simple-ollama-operator/internal/controller"
-	_ "github.com/StartUpNationLabs/simple-ollama-operator/ollama_client"
 	// +kubebuilder:scaffold:imports
 )
 

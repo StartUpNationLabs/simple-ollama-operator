@@ -18,8 +18,7 @@ package controller
 
 import (
 	"context"
-	"github.com/StartUpNationLabs/simple-ollama-operator/ollama_client"
-
+	"github.com/StartUpNationLabs/simple-ollama-operator/internal/ollama_client"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
