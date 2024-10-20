@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	ollamav1 "github.com/StartUpNationLabs/simple-ollama-operator/api/v1"
+	"os"
 )
 
 // ModelReconciler reconciles a Model object
@@ -56,9 +57,15 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		logger.Error(err, "unable to fetch Model")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	// Read url from the Model instance
+	modelUrl := os.Getenv("OLLAMA_URL")
+	if modelUrl == "" {
+		logger.Error(err, "unable to fetch Ollama URL")
+		panic("OLLAMA_URL not set")
+	}
 
 	// create a new Ollama Client
-	ollamaClient, err := ollama_client.NewClientWithResponses(model.Spec.OllamaUrl)
+	ollamaClient, err := ollama_client.NewClientWithResponses(modelUrl)
 	if err != nil {
 		logger.Error(err, "unable to create Ollama Client")
 		return ctrl.Result{}, err

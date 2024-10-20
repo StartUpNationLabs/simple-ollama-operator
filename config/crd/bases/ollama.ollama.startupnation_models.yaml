@@ -41,11 +41,8 @@ spec:
             properties:
               modelName:
                 type: string
-              ollamaUrl:
-                type: string
             required:
             - modelName
-            - ollamaUrl
             type: object
           status:
             description: ModelStatus defines the observed state of Model
