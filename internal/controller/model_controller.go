@@ -55,7 +55,6 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	model := &ollamav1.Model{}
 	err := r.Get(ctx, req.NamespacedName, model)
 	if err != nil {
-		logger.Error(err, "unable to fetch Model")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	// Read url from the Model instance
