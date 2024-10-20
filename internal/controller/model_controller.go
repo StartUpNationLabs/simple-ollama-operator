@@ -23,6 +23,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ollamav1 "github.com/StartUpNationLabs/simple-ollama-operator/api/v1"
 	"os"
@@ -58,48 +59,71 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	// Read url from the Model instance
-	modelUrl := os.Getenv("OLLAMA_URL")
-	if modelUrl == "" {
+	ollamaUrl := os.Getenv("OLLAMA_URL")
+	if ollamaUrl == "" {
 		logger.Error(err, "unable to fetch Ollama URL")
 		panic("OLLAMA_URL not set")
 	}
 
 	// create a new Ollama Client
-	ollamaClient, err := ollama_client.NewClientWithResponses(modelUrl)
+	ollamaClient, err := ollama_client.NewClientWithResponses(ollamaUrl)
 	if err != nil {
 		logger.Error(err, "unable to create Ollama Client")
 		return ctrl.Result{}, err
 	}
 	logger.Info("Ollama Client created")
 	// If the Model is being deleted, delete it from the Ollama Client
-	if model.DeletionTimestamp != nil {
-		logger.Info("Model is being deleted")
-		_, err = ollamaClient.DeleteApiDelete(ctx, &ollama_client.DeleteApiDeleteParams{
-			Model: model.Spec.ModelName,
-		})
-		if err != nil {
-			logger.Error(err, "unable to delete Model", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
+	modelFinalizer := "model.finalizer.ollama.ollama.startupnation"
+
+	if model.ObjectMeta.DeletionTimestamp.IsZero() {
+		// The object is not being deleted, so if it does not have our finalizer,
+		// then lets add the finalizer and update the object.
+		if !containsString(model.ObjectMeta.Finalizers, modelFinalizer) {
+			model.ObjectMeta.Finalizers = append(model.ObjectMeta.Finalizers, modelFinalizer)
+			if err := r.Update(context.Background(), model); err != nil {
+				return reconcile.Result{}, err
+			}
 		}
-		logger.Info("Model deleted")
-		return ctrl.Result{}, nil
+	} else {
+		// The object is being deleted
+		if containsString(model.ObjectMeta.Finalizers, modelFinalizer) {
+			// our finalizer is present, so lets handle our external dependency
+			// first, we delete the external dependency
+			logger.Info("Deleting Model", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
+			_, err := ollamaClient.DeleteApiDelete(ctx, &ollama_client.DeleteApiDeleteParams{
+				Model: model.Spec.ModelName,
+			})
+			if err != nil {
+				logger.Error(err, "unable to delete Model")
+			}
+
+			// remove our finalizer from the list and update it.
+			model.ObjectMeta.Finalizers = removeString(model.ObjectMeta.Finalizers, modelFinalizer)
+			if err := r.Update(context.Background(), model); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+
+		// Our finalizer has finished, so the reconciler can do nothing.
+		return reconcile.Result{}, nil
 	}
 	// if the Model is not being deleted, start reconciliation
 
 	// get the model from the Ollama Client
-	logger.Info("Checking if Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
+	logger.Info("Checking if Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
 	res, err := ollamaClient.PostApiShowWithResponse(ctx, ollama_client.PostApiShowJSONRequestBody{
 		Name: &model.Spec.ModelName,
 	})
 	if err == nil && res.Status() == "200" {
-		logger.Info("Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
+		logger.Info("Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
 		if res.JSON200 != nil {
-			logger.Info("Model exists", "Model Name", res.JSON200.Parameters, "Ollama URL", modelUrl)
+			logger.Info("Model exists", "Model Name", res.JSON200.Parameters, "Ollama URL", ollamaUrl)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
 	}
 	// if the model does not exist, create it
-	logger.Info("Model does not exist, creating Model", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
+	logger.Info("Model does not exist, creating Model", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
 	stream := false
 	_, err = ollamaClient.PostApiPull(ctx, ollama_client.PostApiPullJSONRequestBody{
 		Name:   &model.Spec.ModelName,
@@ -109,7 +133,7 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		logger.Error(err, "unable to create Model")
 		return ctrl.Result{}, err
 	}
-	logger.Info("Model created", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
+	logger.Info("Model created", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
 
 	return ctrl.Result{}, nil
 }
@@ -119,4 +143,24 @@ func (r *ModelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&ollamav1.Model{}).
 		Complete(r)
+}
+
+// Helper functions to check and remove string from a slice of strings.
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func removeString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return
 }
