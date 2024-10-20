@@ -70,26 +70,31 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		logger.Error(err, "unable to create Ollama Client")
 		return ctrl.Result{}, err
 	}
-
+	logger.Info("Ollama Client created")
 	// If the Model is being deleted, delete it from the Ollama Client
 	if model.DeletionTimestamp != nil {
+		logger.Info("Model is being deleted")
 		_, err = ollamaClient.DeleteApiDelete(ctx, &ollama_client.DeleteApiDeleteParams{
 			Model: model.Spec.ModelName,
 		})
 		if err != nil {
-			logger.Error(err, "unable to delete Model")
+			logger.Error(err, "unable to delete Model", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
 		}
+		logger.Info("Model deleted")
 		return ctrl.Result{}, nil
 	}
 	// if the Model is not being deleted, start reconciliation
 
 	// get the model from the Ollama Client
+	logger.Info("Checking if Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
 	res, err := ollamaClient.PostApiShowWithResponse(ctx, ollama_client.PostApiShowJSONRequestBody{
 		Name: &model.Spec.ModelName,
 	})
 	if err == nil {
-		if res.JSON200.Modelfile != nil {
-			logger.Info(*res.JSON200.Modelfile, "Model already exists")
+		logger.Info("Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
+		if res.JSON200 != nil {
+			logger.Info("Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
+			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
 	}

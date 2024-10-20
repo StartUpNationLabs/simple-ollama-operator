@@ -63,7 +63,7 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
-        image: controller:latest
+        image: ghcr.io/startupnationlabs/simple-ollama-operator/operator:b8eda45ff032d75a3a19b55591782aa5d758bbb3
         name: manager
         securityContext:
           allowPrivilegeEscalation: false
@@ -91,5 +91,8 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
+        env:
+          - name: OLLAMA_URL
+            value: http://simple-ollama-operator-ollama:80
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
