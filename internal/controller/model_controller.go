@@ -74,6 +74,7 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// If the Model is being deleted, delete it from the Ollama Client
 	modelFinalizer := "model.finalizer.ollama.ollama.startupnation"
 
+	modelName := unifyModelName(model.Spec.ModelName)
 	if model.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object.
@@ -88,9 +89,9 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		if containsString(model.ObjectMeta.Finalizers, modelFinalizer) {
 			// our finalizer is present, so lets handle our external dependency
 			// first, we delete the external dependency
-			logger.Info("Deleting Model", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
+			logger.Info("Deleting Model", "Model Name", modelName, "Ollama URL", ollamaUrl)
 			_, err := ollamaClient.DeleteApiDelete(ctx, &ollama_client.DeleteApiDeleteParams{
-				Model: model.Spec.ModelName,
+				Model: modelName,
 			})
 			if err != nil {
 				logger.Error(err, "unable to delete Model")
@@ -109,13 +110,13 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// if the Model is not being deleted, start reconciliation
 
 	// get the model from the Ollama Client
-	logger.Info("Checking if Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
+	logger.Info("Checking if Model exists", "Model Name", modelName, "Ollama URL", ollamaUrl)
 	res, err := ollamaClient.PostApiShowWithResponse(ctx, ollama_client.PostApiShowJSONRequestBody{
-		Name: &model.Spec.ModelName,
+		Name: &modelName,
 	})
-	logger.Info("Checking if Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl, "status", res.Status())
+	logger.Info("Checking if Model exists", "Model Name", modelName, "Ollama URL", ollamaUrl, "status", res.Status())
 	if err == nil && res.StatusCode() == 200 {
-		logger.Info("Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
+		logger.Info("Model exists", "Model Name", modelName, "Ollama URL", ollamaUrl)
 		if res.JSON200 != nil {
 			logger.Info("Model exists", "Model Params", res.JSON200.Parameters, "Ollama URL", ollamaUrl)
 			return ctrl.Result{}, nil
@@ -123,17 +124,17 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 	// if the model does not exist, create it
-	logger.Info("Model does not exist, creating Model", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
+	logger.Info("Model does not exist, creating Model", "Model Name", modelName, "Ollama URL", ollamaUrl)
 	stream := false
 	_, err = ollamaClient.PostApiPull(ctx, ollama_client.PostApiPullJSONRequestBody{
-		Name:   &model.Spec.ModelName,
+		Name:   &modelName,
 		Stream: &stream,
 	})
 	if err != nil {
 		logger.Error(err, "unable to create Model")
 		return ctrl.Result{}, err
 	}
-	logger.Info("Model created", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
+	logger.Info("Model created", "Model Name", modelName, "Ollama URL", ollamaUrl)
 
 	return ctrl.Result{}, nil
 }

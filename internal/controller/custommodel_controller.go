@@ -75,6 +75,7 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// If the CustomModel is being deleted, delete it from the Ollama Client
 	CustomModelFinalizer := "CustomModel.finalizer.ollama.ollama.startupnation"
 
+	modelName := unifyModelName(CustomModel.Spec.ModelName)
 	if CustomModel.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object.
@@ -89,9 +90,9 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		if containsString(CustomModel.ObjectMeta.Finalizers, CustomModelFinalizer) {
 			// our finalizer is present, so lets handle our external dependency
 			// first, we delete the external dependency
-			logger.Info("Deleting CustomModel", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
+			logger.Info("Deleting CustomModel", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 			_, err := ollamaClient.DeleteApiDelete(ctx, &ollama_client.DeleteApiDeleteParams{
-				Model: CustomModel.Spec.ModelName,
+				Model: modelName,
 			})
 			if err != nil {
 				logger.Error(err, "unable to delete CustomModel")
@@ -110,33 +111,33 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// if the CustomModel is not being deleted, start reconciliation
 
 	// get the CustomModel from the Ollama Client
-	logger.Info("Checking if CustomModel exists", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
+	logger.Info("Checking if CustomModel exists", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 	res, err := ollamaClient.PostApiShowWithResponse(ctx, ollama_client.PostApiShowJSONRequestBody{
-		Name: &CustomModel.Spec.ModelName,
+		Name: &modelName,
 	})
-	logger.Info("Checking if CustomModel exists", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl, "status", res.Status())
+	logger.Info("Checking if CustomModel exists", "CustomModel Name", modelName, "Ollama URL", ollamaUrl, "status", res.Status())
 	if err == nil && res.StatusCode() == 200 {
-		logger.Info("CustomModel exists", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
+		logger.Info("CustomModel exists", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 		if res.JSON200 != nil {
-			logger.Info("Checking if the ModelFile is the same", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
+			logger.Info("Checking if the ModelFile is the same", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 			if *res.JSON200.Parameters == CustomModel.Spec.ModelFile {
-				logger.Info("ModelFile is the same", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
+				logger.Info("ModelFile is the same", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 				return ctrl.Result{}, nil
 			}
-			logger.Info("ModelFile is not the same", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
+			logger.Info("ModelFile is not the same", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 			// delete the CustomModel and create a new one
-			logger.Info("Deleting CustomModel", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
+			logger.Info("Deleting CustomModel", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 			_, err := ollamaClient.DeleteApiDelete(ctx, &ollama_client.DeleteApiDeleteParams{
-				Model: CustomModel.Spec.ModelName,
+				Model: modelName,
 			})
 			if err != nil {
 				logger.Error(err, "unable to delete CustomModel")
 			}
 			// Create the CustomModel
-			logger.Info("Creating CustomModel", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
+			logger.Info("Creating CustomModel", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 			stream := false
 			_, err = ollamaClient.PostApiCreate(ctx, ollama_client.PostApiCreateJSONRequestBody{
-				Name:      &CustomModel.Spec.ModelName,
+				Name:      &modelName,
 				Modelfile: &CustomModel.Spec.ModelFile,
 				Stream:    &stream,
 			})
@@ -148,10 +149,10 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 	// if the CustomModel does not exist, create it
-	logger.Info("CustomModel does not exist, creating CustomModel", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl, "ModelFile", CustomModel.Spec.ModelFile)
+	logger.Info("CustomModel does not exist, creating CustomModel", "CustomModel Name", modelName, "Ollama URL", ollamaUrl, "ModelFile", CustomModel.Spec.ModelFile)
 	stream := false
 	_, err = ollamaClient.PostApiCreate(ctx, ollama_client.PostApiCreateJSONRequestBody{
-		Name:      &CustomModel.Spec.ModelName,
+		Name:      &modelName,
 		Modelfile: &CustomModel.Spec.ModelFile,
 		Stream:    &stream,
 	})
@@ -159,7 +160,7 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		logger.Error(err, "unable to create CustomModel")
 		return ctrl.Result{}, err
 	}
-	logger.Info("CustomModel created", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
+	logger.Info("CustomModel created", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 
 	return ctrl.Result{}, nil
 }
