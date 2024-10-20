@@ -83,9 +83,6 @@ paths:
                 name:
                   type: string
                   description: Name of the model to create (required)
-                path:
-                  type: string
-                  description: Path to the Modelfile
                 modelfile:
                   type: string
                   description: The Modelfile contents

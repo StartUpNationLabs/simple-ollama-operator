@@ -155,7 +155,7 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Modelfile: &CustomModel.Spec.ModelFile,
 		Stream:    &stream,
 	})
-	if err != nil {
+	if err != nil || res.StatusCode() != 200 {
 		logger.Error(err, "unable to create CustomModel")
 		return ctrl.Result{}, err
 	}

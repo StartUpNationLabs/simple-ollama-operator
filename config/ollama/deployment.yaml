@@ -22,6 +22,8 @@ spec:
           env:
             - name: OLLAMA_LOG_LEVEL
               value: "DEBUG"
+            - name: OLLAMA_DEBUG
+              value: "1"
 ---
 apiVersion: v1
 kind: Service

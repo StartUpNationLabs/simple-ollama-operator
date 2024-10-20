@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: mario-custommodel-sample
 spec:
-  modelName: mario-custommodel-sample
+  modelName: mario-custommodel-sample:v1
   modelFile: >-
     FROM llama3.2
     # sets the temperature to 1 [higher is more creative, lower is more coherent]
