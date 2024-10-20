@@ -148,7 +148,7 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 	// if the CustomModel does not exist, create it
-	logger.Info("CustomModel does not exist, creating CustomModel", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
+	logger.Info("CustomModel does not exist, creating CustomModel", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl, "ModelFile", CustomModel.Spec.ModelFile)
 	stream := false
 	_, err = ollamaClient.PostApiCreate(ctx, ollama_client.PostApiCreateJSONRequestBody{
 		Name:      &CustomModel.Spec.ModelName,
