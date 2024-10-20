@@ -99,6 +99,7 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 	// if the model does not exist, create it
+	logger.Info("Model does not exist, creating Model", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
 	stream := false
 	_, err = ollamaClient.PostApiPull(ctx, ollama_client.PostApiPullJSONRequestBody{
 		Name:   &model.Spec.ModelName,
@@ -108,6 +109,7 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		logger.Error(err, "unable to create Model")
 		return ctrl.Result{}, err
 	}
+	logger.Info("Model created", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
 
 	return ctrl.Result{}, nil
 }
