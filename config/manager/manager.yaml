@@ -63,7 +63,7 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
-        image: ghcr.io/startupnationlabs/simple-ollama-operator/operator:b8eda45ff032d75a3a19b55591782aa5d758bbb3
+        image: ghcr.io/startupnationlabs/simple-ollama-operator/operator:cb75780e3ab2a3933ec48f86baf6eaa83fadb99b
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

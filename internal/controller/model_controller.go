@@ -90,10 +90,10 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	res, err := ollamaClient.PostApiShowWithResponse(ctx, ollama_client.PostApiShowJSONRequestBody{
 		Name: &model.Spec.ModelName,
 	})
-	if err == nil {
+	if err == nil && res.Status() == "200" {
 		logger.Info("Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
 		if res.JSON200 != nil {
-			logger.Info("Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", modelUrl)
+			logger.Info("Model exists", "Model Name", res.JSON200.Parameters, "Ollama URL", modelUrl)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
