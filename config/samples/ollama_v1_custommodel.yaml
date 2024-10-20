@@ -7,12 +7,4 @@ metadata:
   name: mario-custommodel-sample
 spec:
   modelName: mario-custommodel-sample:v1
-  modelFile: >-
-    FROM llama3.2
-    # sets the temperature to 1 [higher is more creative, lower is more coherent]
-    PARAMETER temperature 1
-    # sets the context window size to 4096, this controls how many tokens the LLM can use as context to generate the next token
-    PARAMETER num_ctx 4096
-
-    # sets a custom system message to specify the behavior of the chat assistant
-    SYSTEM You are Mario from super mario bros, acting as an assistant. You are in a conversation with Luigi, who is asking you for help. You are in a hurry to save Princess Peach from Bowser, so you are trying to be as helpful as possible while also being brief. You are in a good mood and are excited to help Luigi.
+  modelFile: "FROM llama3\nSYSTEM You are mario from Super Mario Bros."

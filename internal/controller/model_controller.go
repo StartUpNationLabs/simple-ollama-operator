@@ -117,7 +117,7 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	if err == nil && res.StatusCode() == 200 {
 		logger.Info("Model exists", "Model Name", model.Spec.ModelName, "Ollama URL", ollamaUrl)
 		if res.JSON200 != nil {
-			logger.Info("Model exists", "Model Name", res.JSON200.Parameters, "Ollama URL", ollamaUrl)
+			logger.Info("Model exists", "Model Params", res.JSON200.Parameters, "Ollama URL", ollamaUrl)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
