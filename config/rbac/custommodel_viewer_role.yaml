@@ -1,35 +1,23 @@
----
+# permissions for end users to view custommodels.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  labels:
+    app.kubernetes.io/name: simple-ollama-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: custommodel-viewer-role
 rules:
 - apiGroups:
   - ollama.ollama.startupnation
   resources:
   - custommodels
-  - models
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - ollama.ollama.startupnation
   resources:
-  - custommodels/finalizers
-  - models/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ollama.ollama.startupnation
-  resources:
   - custommodels/status
-  - models/status
   verbs:
   - get
-  - patch
-  - update

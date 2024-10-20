@@ -17,4 +17,13 @@ resources:
   kind: Model
   path: github.com/StartUpNationLabs/simple-ollama-operator/api/v1
   version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: ollama.startupnation
+  group: ollama
+  kind: CustomModel
+  path: github.com/StartUpNationLabs/simple-ollama-operator/api/v1
+  version: v1
 version: "3"

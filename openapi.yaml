@@ -86,6 +86,12 @@ paths:
                 path:
                   type: string
                   description: Path to the Modelfile
+                modelfile:
+                  type: string
+                  description: The Modelfile contents
+                stream:
+                  type: boolean
+                  description: Stream the Modelfile
       responses:
         '200':
           description: A stream of JSON objects with status "success"
