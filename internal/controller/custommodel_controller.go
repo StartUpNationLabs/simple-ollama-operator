@@ -115,7 +115,7 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Name: &CustomModel.Spec.ModelName,
 	})
 	logger.Info("Checking if CustomModel exists", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl, "status", res.Status())
-	if err == nil && res.Status() == "200" {
+	if err == nil && res.StatusCode() == 200 {
 		logger.Info("CustomModel exists", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
 		if res.JSON200 != nil {
 			logger.Info("Checking if the ModelFile is the same", "CustomModel Name", CustomModel.Spec.ModelName, "Ollama URL", ollamaUrl)
