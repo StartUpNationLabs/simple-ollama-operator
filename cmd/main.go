@@ -19,7 +19,10 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -51,6 +54,34 @@ func init() {
 
 	utilruntime.Must(ollamav1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
+}
+
+// getWatchNamespace returns the Namespace the operator should be watching for changes
+func getWatchNamespaces() []string {
+	// WatchNamespaceEnvVar is the constant for env variable WATCH_NAMESPACE
+	// which specifies the Namespace to watch.
+	// An empty value means the operator is running with cluster scope.
+	var watchNamespaceEnvVar = "WATCH_NAMESPACE"
+
+	ns, found := os.LookupEnv(watchNamespaceEnvVar)
+	if !found {
+		setupLog.Info(fmt.Sprintf("%s not set, watching all Namespaces", watchNamespaceEnvVar))
+		return []string{}
+	}
+	// split the string by comma to support multiple namespaces
+	// check if , is present in the string
+	if strings.Contains(ns, ",") {
+		return strings.Split(ns, ",")
+	}
+	return []string{ns}
+}
+func getWatchNamespaceConfig() map[string]cache.Config {
+	defaultNamespaces := make(map[string]cache.Config)
+
+	for _, ns := range getWatchNamespaces() {
+		defaultNamespaces[ns] = cache.Config{}
+	}
+	return defaultNamespaces
 }
 
 func main() {
@@ -139,6 +170,9 @@ func main() {
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
+		Cache: cache.Options{
+			DefaultNamespaces: getWatchNamespaceConfig(),
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
