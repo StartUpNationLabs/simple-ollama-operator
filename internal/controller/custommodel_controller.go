@@ -18,8 +18,8 @@ package controller
 
 import (
 	"context"
+
 	"github.com/StartUpNationLabs/simple-ollama-operator/internal/ollama_client"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,14 +58,9 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	// Read url from the CustomModel instance
-	ollamaUrl := os.Getenv("OLLAMA_URL")
-	if ollamaUrl == "" {
-		logger.Error(err, "unable to fetch Ollama URL")
-		panic("OLLAMA_URL not set")
-	}
 
 	// create a new Ollama Client
+	ollamaUrl := CustomModel.Spec.OllamaUrl
 	ollamaClient, err := ollama_client.NewClientWithResponses(ollamaUrl)
 	if err != nil {
 		logger.Error(err, "unable to create Ollama Client")

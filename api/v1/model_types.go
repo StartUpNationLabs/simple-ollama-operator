@@ -36,8 +36,7 @@ type ModelSpec struct {
 type ModelStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	//Conditions []metav1.Condition `json:"conditions"`
-
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true

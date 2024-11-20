@@ -7,3 +7,4 @@ metadata:
   name: lamamode3.2
 spec:
   modelName: llama3.2:3b
+  ollamaUrl: http://simple-ollama-operator-ollama

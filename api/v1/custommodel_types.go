@@ -28,6 +28,7 @@ type CustomModelSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	OllamaUrl string `json:"ollamaUrl"`
 	ModelName string `json:"modelName"`
 	ModelFile string `json:"modelFile"`
 }
