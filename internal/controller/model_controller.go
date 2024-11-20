@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+
 	"github.com/StartUpNationLabs/simple-ollama-operator/internal/ollama_client"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -26,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ollamav1 "github.com/StartUpNationLabs/simple-ollama-operator/api/v1"
-	"os"
 )
 
 // ModelReconciler reconciles a Model object
@@ -57,14 +57,10 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	// Read url from the Model instance
-	ollamaUrl := os.Getenv("OLLAMA_URL")
-	if ollamaUrl == "" {
-		logger.Error(err, "unable to fetch Ollama URL")
-		panic("OLLAMA_URL not set")
-	}
 
 	// create a new Ollama Client
+	ollamaUrl := model.Spec.OllamaUrl
+
 	ollamaClient, err := ollama_client.NewClientWithResponses(ollamaUrl)
 	if err != nil {
 		logger.Error(err, "unable to create Ollama Client")
@@ -75,6 +71,7 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	modelFinalizer := "model.finalizer.ollama.ollama.startupnation"
 
 	modelName := unifyModelName(model.Spec.ModelName)
+
 	if model.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object.
