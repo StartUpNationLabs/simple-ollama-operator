@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/StartUpNationLabs/simple-ollama-operator/internal/ollama_client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,15 +53,15 @@ type CustomModelReconciler struct {
 func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	// Fetch the Model instance
-	CustomModel := &ollamav1.CustomModel{}
-	err := r.Get(ctx, req.NamespacedName, CustomModel)
+	// Fetch the CustomModel instance
+	customModel := &ollamav1.CustomModel{}
+	err := r.Get(ctx, req.NamespacedName, customModel)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// create a new Ollama Client
-	ollamaUrl := CustomModel.Spec.OllamaUrl
+	ollamaUrl := customModel.Spec.OllamaUrl
 	ollamaClient, err := ollama_client.NewClientWithResponses(ollamaUrl)
 	if err != nil {
 		logger.Error(err, "unable to create Ollama Client")
@@ -68,21 +69,21 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	logger.Info("Ollama Client created")
 	// If the CustomModel is being deleted, delete it from the Ollama Client
-	CustomModelFinalizer := "CustomModel.finalizer.ollama.ollama.startupnation"
+	customModelFinalizer := "custommodel.finalizer.ollama.ollama.startupnation"
 
-	modelName := unifyModelName(CustomModel.Spec.ModelName)
-	if CustomModel.ObjectMeta.DeletionTimestamp.IsZero() {
+	modelName := unifyModelName(customModel.Spec.ModelName)
+	if customModel.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object.
-		if !containsString(CustomModel.ObjectMeta.Finalizers, CustomModelFinalizer) {
-			CustomModel.ObjectMeta.Finalizers = append(CustomModel.ObjectMeta.Finalizers, CustomModelFinalizer)
-			if err := r.Update(context.Background(), CustomModel); err != nil {
+		if !containsString(customModel.ObjectMeta.Finalizers, customModelFinalizer) {
+			customModel.ObjectMeta.Finalizers = append(customModel.ObjectMeta.Finalizers, customModelFinalizer)
+			if err := r.Update(context.Background(), customModel); err != nil {
 				return reconcile.Result{}, err
 			}
 		}
 	} else {
 		// The object is being deleted
-		if containsString(CustomModel.ObjectMeta.Finalizers, CustomModelFinalizer) {
+		if containsString(customModel.ObjectMeta.Finalizers, customModelFinalizer) {
 			// our finalizer is present, so lets handle our external dependency
 			// first, we delete the external dependency
 			logger.Info("Deleting CustomModel", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
@@ -94,8 +95,8 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			}
 
 			// remove our finalizer from the list and update it.
-			CustomModel.ObjectMeta.Finalizers = removeString(CustomModel.ObjectMeta.Finalizers, CustomModelFinalizer)
-			if err := r.Update(context.Background(), CustomModel); err != nil {
+			customModel.ObjectMeta.Finalizers = removeString(customModel.ObjectMeta.Finalizers, customModelFinalizer)
+			if err := r.Update(context.Background(), customModel); err != nil {
 				return reconcile.Result{}, err
 			}
 		}
@@ -104,6 +105,11 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return reconcile.Result{}, nil
 	}
 	// if the CustomModel is not being deleted, start reconciliation
+
+	// Update status to indicate reconciliation has started
+	if err := r.updateStatus(ctx, customModel, "ReconciliationStarted", metav1.ConditionTrue, "Reconciling", "Reconciliation process has started"); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// get the CustomModel from the Ollama Client
 	logger.Info("Checking if CustomModel exists", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
@@ -115,8 +121,12 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		logger.Info("CustomModel exists", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 		if res.JSON200 != nil {
 			logger.Info("Checking if the ModelFile is the same", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
-			if *res.JSON200.Parameters == CustomModel.Spec.ModelFile {
+			if *res.JSON200.Parameters == customModel.Spec.ModelFile {
 				logger.Info("ModelFile is the same", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
+				// Update status to indicate model exists
+				if err := r.updateStatus(ctx, customModel, "CustomModelExists", metav1.ConditionTrue, "ModelFound", "CustomModel exists in Ollama"); err != nil {
+					return ctrl.Result{}, err
+				}
 				return ctrl.Result{}, nil
 			}
 			logger.Info("ModelFile is not the same", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
@@ -133,31 +143,59 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			stream := false
 			_, err = ollamaClient.PostApiCreate(ctx, ollama_client.PostApiCreateJSONRequestBody{
 				Name:      &modelName,
-				Modelfile: &CustomModel.Spec.ModelFile,
+				Modelfile: &customModel.Spec.ModelFile,
 				Stream:    &stream,
 			})
 			if err != nil {
 				logger.Error(err, "unable to create CustomModel")
+				// Update status to indicate model creation failed
+				if err := r.updateStatus(ctx, customModel, "CustomModelCreationFailed", metav1.ConditionTrue, "CreationFailed", "Failed to create CustomModel in Ollama"); err != nil {
+					return ctrl.Result{}, err
+				}
 				return ctrl.Result{}, err
 			}
+		}
+		// Update status to indicate model creation succeeded
+		if err := r.updateStatus(ctx, customModel, "CustomModelCreated", metav1.ConditionTrue, "CreationSucceeded", "CustomModel created successfully in Ollama"); err != nil {
+			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, err
 	}
 	// if the CustomModel does not exist, create it
-	logger.Info("CustomModel does not exist, creating CustomModel", "CustomModel Name", modelName, "Ollama URL", ollamaUrl, "ModelFile", CustomModel.Spec.ModelFile)
+	logger.Info("CustomModel does not exist, creating CustomModel", "CustomModel Name", modelName, "Ollama URL", ollamaUrl, "ModelFile", customModel.Spec.ModelFile)
 	stream := false
 	_, err = ollamaClient.PostApiCreate(ctx, ollama_client.PostApiCreateJSONRequestBody{
 		Name:      &modelName,
-		Modelfile: &CustomModel.Spec.ModelFile,
+		Modelfile: &customModel.Spec.ModelFile,
 		Stream:    &stream,
 	})
 	if err != nil || res.StatusCode() != 200 {
 		logger.Error(err, "unable to create CustomModel")
+		// Update status to indicate model creation failed
+		if err := r.updateStatus(ctx, customModel, "CustomModelCreationFailed", metav1.ConditionTrue, "CreationFailed", "Failed to create CustomModel in Ollama"); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{}, err
 	}
 	logger.Info("CustomModel created", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
+	// Update status to indicate model creation succeeded
+	if err := r.updateStatus(ctx, customModel, "CustomModelCreated", metav1.ConditionTrue, "CreationSucceeded", "CustomModel created successfully in Ollama"); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
+}
+
+// updateStatus is a helper function to update the status conditions of the CustomModel
+func (r *CustomModelReconciler) updateStatus(ctx context.Context, customModel *ollamav1.CustomModel, conditionType string, status metav1.ConditionStatus, reason string, message string) error {
+	customModel.Status.Conditions = append(customModel.Status.Conditions, metav1.Condition{
+		Type:               conditionType,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	})
+	return r.Status().Update(ctx, customModel)
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/StartUpNationLabs/simple-ollama-operator/internal/ollama_client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -106,6 +107,11 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 	// if the Model is not being deleted, start reconciliation
 
+	// Update status to indicate reconciliation has started
+	if err := r.updateStatus(ctx, model, "ReconciliationStarted", metav1.ConditionTrue, "Reconciling", "Reconciliation process has started"); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// get the model from the Ollama Client
 	logger.Info("Checking if Model exists", "Model Name", modelName, "Ollama URL", ollamaUrl)
 	res, err := ollamaClient.PostApiShowWithResponse(ctx, ollama_client.PostApiShowJSONRequestBody{
@@ -116,6 +122,10 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		logger.Info("Model exists", "Model Name", modelName, "Ollama URL", ollamaUrl)
 		if res.JSON200 != nil {
 			logger.Info("Model exists", "Model Params", res.JSON200.Parameters, "Ollama URL", ollamaUrl)
+			// Update status to indicate model exists
+			if err := r.updateStatus(ctx, model, "ModelExists", metav1.ConditionTrue, "ModelFound", "Model exists in Ollama"); err != nil {
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
@@ -129,11 +139,31 @@ func (r *ModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	})
 	if err != nil {
 		logger.Error(err, "unable to create Model")
+		// Update status to indicate model creation failed
+		if err := r.updateStatus(ctx, model, "ModelCreationFailed", metav1.ConditionTrue, "CreationFailed", "Failed to create model in Ollama"); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{}, err
 	}
 	logger.Info("Model created", "Model Name", modelName, "Ollama URL", ollamaUrl)
+	// Update status to indicate model creation succeeded
+	if err := r.updateStatus(ctx, model, "ModelCreated", metav1.ConditionTrue, "CreationSucceeded", "Model created successfully in Ollama"); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
+}
+
+// updateStatus is a helper function to update the status conditions of the Model
+func (r *ModelReconciler) updateStatus(ctx context.Context, model *ollamav1.Model, conditionType string, status metav1.ConditionStatus, reason string, message string) error {
+	model.Status.Conditions = append(model.Status.Conditions, metav1.Condition{
+		Type:               conditionType,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	})
+	return r.Status().Update(ctx, model)
 }
 
 // SetupWithManager sets up the controller with the Manager.
