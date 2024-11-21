@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+				http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -107,7 +107,7 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// if the CustomModel is not being deleted, start reconciliation
 
 	// Update status to indicate reconciliation has started
-	if err := r.updateStatus(ctx, customModel, "ReconciliationStarted", metav1.ConditionTrue, "Reconciling", "Reconciliation process has started"); err != nil {
+	if err := r.updateStatus(ctx, customModel, StatusReconciliationStarted); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -124,7 +124,7 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			if *res.JSON200.Parameters == customModel.Spec.ModelFile {
 				logger.Info("ModelFile is the same", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 				// Update status to indicate model exists
-				if err := r.updateStatus(ctx, customModel, "CustomModelExists", metav1.ConditionTrue, "ModelFound", "CustomModel exists in Ollama"); err != nil {
+				if err := r.updateStatus(ctx, customModel, StatusModelExists); err != nil {
 					return ctrl.Result{}, err
 				}
 				return ctrl.Result{}, nil
@@ -149,14 +149,14 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			if err != nil {
 				logger.Error(err, "unable to create CustomModel")
 				// Update status to indicate model creation failed
-				if err := r.updateStatus(ctx, customModel, "CustomModelCreationFailed", metav1.ConditionTrue, "CreationFailed", "Failed to create CustomModel in Ollama"); err != nil {
+				if err := r.updateStatus(ctx, customModel, StatusCreationFailed); err != nil {
 					return ctrl.Result{}, err
 				}
 				return ctrl.Result{}, err
 			}
 		}
 		// Update status to indicate model creation succeeded
-		if err := r.updateStatus(ctx, customModel, "CustomModelCreated", metav1.ConditionTrue, "CreationSucceeded", "CustomModel created successfully in Ollama"); err != nil {
+		if err := r.updateStatus(ctx, customModel, StatusCreationSucceeded); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, err
@@ -172,14 +172,14 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil || res.StatusCode() != 200 {
 		logger.Error(err, "unable to create CustomModel")
 		// Update status to indicate model creation failed
-		if err := r.updateStatus(ctx, customModel, "CustomModelCreationFailed", metav1.ConditionTrue, "CreationFailed", "Failed to create CustomModel in Ollama"); err != nil {
+		if err := r.updateStatus(ctx, customModel, StatusCreationFailed); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, err
 	}
 	logger.Info("CustomModel created", "CustomModel Name", modelName, "Ollama URL", ollamaUrl)
 	// Update status to indicate model creation succeeded
-	if err := r.updateStatus(ctx, customModel, "CustomModelCreated", metav1.ConditionTrue, "CreationSucceeded", "CustomModel created successfully in Ollama"); err != nil {
+	if err := r.updateStatus(ctx, customModel, StatusCreationSucceeded); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -187,13 +187,22 @@ func (r *CustomModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 // updateStatus is a helper function to update the status conditions of the CustomModel
-func (r *CustomModelReconciler) updateStatus(ctx context.Context, customModel *ollamav1.CustomModel, conditionType string, status metav1.ConditionStatus, reason string, message string) error {
+func (r *CustomModelReconciler) updateStatus(ctx context.Context, customModel *ollamav1.CustomModel, status ModelStatus) error {
+	// if new conditionstatus is Unknown and old conditionstatus is True or False, then do not update the condition
+	if len(customModel.Status.Conditions) > 0 && customModel.Status.Conditions[0].Status != metav1.ConditionUnknown && status.status == metav1.ConditionUnknown {
+		return r.Status().Update(ctx, customModel)
+	}
+
+	// Clear the Conditions
+	customModel.Status.Conditions = []metav1.Condition{}
+
+	// Append the new Condition
 	customModel.Status.Conditions = append(customModel.Status.Conditions, metav1.Condition{
-		Type:               conditionType,
-		Status:             status,
+		Type:               status.conditionType,
+		Status:             status.status,
 		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
+		Reason:             status.reason,
+		Message:            status.message,
 	})
 	return r.Status().Update(ctx, customModel)
 }
